@@ -1,2 +1,2 @@
 run:
-	- python -u *.py
+    - python -u *.py

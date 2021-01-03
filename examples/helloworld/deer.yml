@@ -1,4 +1,4 @@
 prerun:
-	- echo "This is a prerun that only happens once!"
+    - echo "This is a prerun that only happens once!"
 run:
-	- echo "Hello deer world!"
+    - echo "Hello deer world!"

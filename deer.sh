@@ -1,4 +1,5 @@
 #!/bin/bash
+
 if [[ "$#" == "0" || ("$#" == "1" && ("$1" == "help" || "$1" == "-h")) ]]; then
 	echo "
 Usage:	deer [OPTIONS]
@@ -17,7 +18,7 @@ Options:
   safemode                  Display whether safemode is on or off
       	                    Safemode only allows you to download and execute repo's made with your own deer id. When safemode is on, deer id must be set. 
                             To download and execute any public repo, turn safemode off: deer safemode off
-  id                        Display the currently set deer id (given on the deer cloud: https://deer.obss.be)
+  id                        Display the currently set deer id (given on the deer cloud: https://deercore.org)
                             Deer id is mainly needed to push repo's to the deer cloud, but also to read and execute repo's when safemode is on. Set deer id: deer id <myDeerId>
   uninstall                 Uninstall deer
   herd <repo>               Deploy multiple deer files structured by a herd file
@@ -51,15 +52,20 @@ Examples:
 	exit 2
 fi
 
-VERSION="1.2.14"
+VERSION="1.2.24"
 
 red=`tput setaf 1`
 green=`tput setaf 2`
 reset=`tput sgr0`
 
+deerId=""
+if [ -f "$HOME/.deer/deerId.conf" ]; then
+	read -r deerId < "$HOME/.deer/deerId.conf"
+fi
+
 if [[ "$1" == "update" || "$1" == "upgrade" ]]; then
 	cd /tmp
-	sudo wget -q "https://deer.obss.be/install.tar.gz" -O deer.tar.gz
+	sudo wget -q "https://deercore.org/install.tar.gz" -O deer.tar.gz
 	sudo tar -xf deer.tar.gz
 	sudo rm -f deer.tar.gz
 	
@@ -68,10 +74,9 @@ if [[ "$1" == "update" || "$1" == "upgrade" ]]; then
 		echo "Latest version is already installed"
 		exit 0
 	fi
-
 	sudo chmod +x run.sh
-	sudo bash run.sh
-	sudo rm run.sh
+	sudo bash run.sh $USER
+	#sudo rm run.sh
 	echo "Successfully upgraded deer"
 	exit 0
 fi
@@ -199,10 +204,13 @@ if [[ "$1" == "uninstall" ]]; then
 	echo "Uninstalling deer $VERSION"
 	sudo rm -f /usr/lib/deer.sh
 	sudo rm -f /usr/bin/deer.sh
-#	if [ -d "/etc/deer" ]; then
-#		sudo rm -f /etc/deer/deerId
-#		sudo rmdir /etc/deer
-#	fi
+	sudo rm -f /usr/bin/deer
+	sudo service deerd stop
+	sudo systemctl disable deerd
+	sudo rm -f /etc/systemd/system/deerd.service
+	sudo rm -f /srv/deerd/deerDaemon.sh
+	sudo rmdir /srv/deerd
+
 	cd
 	if [ -d ".deer" ]; then
 		cd ".deer"
@@ -267,10 +275,16 @@ if [[ "$1" == "id" ]]; then
 	exit 0
 fi
 
-if [[ "$1" == "push" && "$#" -eq 2 ]]; then
-	echo "Pushing $2 to the deer cloud"
-	if [[ ! -f "deer.yml" && ! -f "$2.herd" ]]; then
-		echo "No runnable deer file and/or herd file found. Add deer.yml to make an executable deer file or $2.herd to compile a herd of deer files."
+if [[ "$1" == "push" ]]; then
+	dirname=$(pwd)
+	result="${dirname%"${dirname##*[!/]}"}" # extglob-free multi-trailing-/ trim
+	dir="${result##*/}"      
+	if [[ "$#" -eq 2 ]]; then
+		dir="$2"
+	fi
+	echo "Pushing $dir to the deer cloud"
+	if [[ ! -f "deer.yml" && ! -f "$dir.herd" ]]; then
+		echo "No runnable deer file and/or herd file found. Add deer.yml to make an executable deer file or $dir.herd to compile a herd of deer files."
 		exit 2
 	fi
 	if [ ! -f "$HOME/.deer/deerId.conf" ]; then
@@ -279,8 +293,8 @@ if [[ "$1" == "push" && "$#" -eq 2 ]]; then
 	fi
 	moved=false
 	if [ -f "deer.yml" ]; then
-		bash -c "echo '#!/bin/bash' > run.$2.sh"
-		bash -c "echo 'if [[ \"\$#\" -eq 2 && \"\$1\" == \"-c\" ]]; then conf=\"config=\$2\"; else conf=\"\"; fi' >> run.$2.sh"
+		bash -c "echo '#!/bin/bash' > run.$dir.sh"
+		bash -c "echo 'if [[ \"\$#\" -eq 2 && \"\$1\" == \"-c\" ]]; then conf=\"config=\$dir\"; else conf=\"\"; fi' >> run.$dir.sh"
 		prerunBegun=false
 		runBegun=false
 		while IFS= read -r line
@@ -289,17 +303,17 @@ if [[ "$1" == "push" && "$#" -eq 2 ]]; then
 				#add runnable command line
 				line=$(echo "$line" | xargs | cut -c 2-)
 				if [[ "$line" == *"java"* ]]; then
-					bash -c "echo 'if [[ \"\$conf\" != \"\" ]]; then conf=\"--spring.config.location=\$2\"; fi' >> run.$2.sh"
-					bash -c "echo '$line \"\$conf\" &' >> run.$2.sh"
+					bash -c "echo 'if [[ \"\$conf\" != \"\" ]]; then conf=\"--spring.config.location=\$dir\"; fi' >> run.$dir.sh"
+					bash -c "echo '$line \"\$conf\" &' >> run.$dir.sh"
 				else
-					bash -c "echo '$line \"\$conf\" &' >> run.$2.sh"
+					bash -c "echo '$line \"\$conf\" &' >> run.$dir.sh"
 				fi
-				bash -c "echo 'echo \$! >> running.pid' >> run.$2.sh"
+				bash -c "echo 'echo \$! >> running.pid' >> run.$dir.sh"
 			fi
 			if [[ "$prerunBegun" == true && "$line" == *"-"* ]]; then
 				#add prerun step
 				line=$(echo "$line" | xargs | cut -c 2-)
-				bash -c "echo '$line' >> prerun.$2.sh"
+				bash -c "echo '$line' >> prerun.$dir.sh"
 			fi
 			if [[ "$runBegun" == false && "$line" == "run:"* ]]; then
 				runBegun=true
@@ -308,24 +322,25 @@ if [[ "$1" == "push" && "$#" -eq 2 ]]; then
 			if [[ "$prerunBegun" == false && "$line" == "prerun:"* ]]; then
 				prerunBegun=true
 				runBegun=false
-				bash -c "echo '#!/bin/bash' > prerun.$2.sh"
+				bash -c "echo '#!/bin/bash' > prerun.$dir.sh"
 			fi
 		done < "deer.yml"
-		bash -c "echo 'while true; do sleep 10; done' >> run.$2.sh"
+		bash -c "echo 'while true; do sleep 10; done' >> run.$dir.sh"
 		moved=true
 	fi
-	tar --exclude="$2.tar.gz" -czf "$2.tar.gz" *
+	tar --exclude="$dir.tar.gz" -czf "$dir.tar.gz" *
 	read -r deerId < "$HOME/.deer/deerId.conf"
 
 	#split file in chunks of 100MB for upload
 	mkdir tmp
-	mv "$2.tar.gz" tmp/.
+	mv "$dir.tar.gz" tmp/.
 	cd tmp
-	split -l 500000 "$2.tar.gz"
-	rm -f "$2.tar.gz"
+	checksum=$(md5sum "$dir.tar.gz" | cut -d ' ' -f1)
+	split -l 500000 "$dir.tar.gz"
+	rm -f "$dir.tar.gz"
 	order=0
 	for chunk in *; do
-		uploadResponse=$(curl -s -L -F "deerified=@$chunk" -F "deerId=$deerId" -F "repoName=$2.tar.gz" -F "order=$order" -F "runnable=$moved" https://deer.obss.be/upload.php)
+		uploadResponse=$(curl -L -F "deerified=@$chunk" -F "deerId=$deerId" -F "repoName=$dir.tar.gz" -F "order=$order" -F "runnable=$moved" -F "checksum=$checksum" https://deercore.org/upload.php)
 		echo "$uploadResponse" | cut -d ':' -f2 | cut -d '"' -f2
 		order=$((order+1))
 	done
@@ -333,17 +348,22 @@ if [[ "$1" == "push" && "$#" -eq 2 ]]; then
 	cd ..
 	rmdir tmp
 	if [[ "$moved" == true ]]; then
-		rm -f "run.$2.sh"
-		[ -f "prerun.$2.sh" ] && rm -f "prerun.$2.sh"
+		rm -f "run.$dir.sh"
+		[ -f "prerun.$dir.sh" ] && rm -f "prerun.$dir.sh"
 	fi
 	exit 0
 fi
 
-if [[ "$1" == "stop" && "$#" -eq 2 ]]; then
-	cd "$HOME/.deer/$2"
-	kill -9 `cat running.pid` 2> /dev/null
-	[ -f running.pid ] && rm -f running.pid
-	kill -9 $(pgrep -f "run.$2") 2> /dev/null
+if [[ "$1" == "stop" && "$#" -gt 1 ]]; then
+	for var in "$@"
+	do
+		if [[ "$var" != "stop" ]]; then
+			cd "$HOME/.deer/$var"
+			[ -f running.pid ] && kill -9 `cat running.pid` 2> /dev/null
+			[ -f running.pid ] && rm -f running.pid
+			kill -9 $(pgrep -f "run.$var") 2> /dev/null
+		fi
+	done
 	exit 0
 fi
 
@@ -372,7 +392,14 @@ if [[ "$1" == "logs" && ( "$#" == "2" || "$#" == "3" ) ]]; then
 	exit 0
 fi
 
-if [[ ( "$#" == "1" ) && ( "$1" == "push" || "$1" == "herd" || "$1" == "pull" || "$1" == "stop" || "$1" == "restart" || "$1" == "logs" || "$1" == "add" ) ]]; then
+if [[ "$1" == "search" && "$#" == "2" ]]; then
+	hostname=$(hostname)
+	resp=$(curl -s -L "https://deercore.org/api.php?action=search&hostname=$hostname&deerId=$deerId&repos=$2")
+	echo $resp | cut -d ':' -f2 | cut -d '"' -f2 | sed 's/\\n/\n /g' | sed 's/\\//g'
+	exit 0
+fi
+
+if [[ ( "$#" == "1" ) && ( "$1" == "push" || "$1" == "herd" || "$1" == "pull" || "$1" == "stop" || "$1" == "restart" || "$1" == "logs" || "$1" == "add" || "$1" == "search" ) ]]; then
 	echo "No decent repo mentioned"
 	exit 0
 fi
@@ -457,7 +484,7 @@ if [ "$created" = true ]; then
 
 	#finally get the repo and execute
 	echo "[$repo] Pulling $repo from the deer cloud"
-	wget -q "https://deer.obss.be?run=$repo&$safeModeParam" -O deer.tar.gz -o /dev/null
+	wget -q "https://deercore.org?run=$repo&$safeModeParam" -O deer.tar.gz -o /dev/null
 	if tar -xf deer.tar.gz 2>/dev/null
 	then
 		rm -f deer.tar.gz
@@ -478,7 +505,7 @@ if [ "$created" = true ]; then
 			fi
 		fi
 	else
-		cloudResp=$(cat deer.tar.gz | cut -d ':' -f2 | cut -d '"' -f2)
+		cloudResp=$(cat deer.tar.gz | cut -d ':' -f2 | cut -d '"' -f2 | sed 's/\\n/\n /g' | sed 's/\\//g')
 		echo "[$repo] Deer cloud: $cloudResp"
 		rm -rf *
 		cd ..

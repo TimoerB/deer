@@ -1,19 +1,17 @@
 # Deer
-Deer - Download Extract make Executable & Run - is a lightweight deploy manager to create, run and manage executable tarballs for any software. Official website and more information can be found on: https://deer.obss.be .
+Deer - Download Extract make Executable & Run - is a lightweight deploy manager to create, run and manage executable tarballs for any software. Official website and more information can be found on: https://deercore.org .
 
 ## Install Deer
 
 To install deer, open a terminal with root access and copypaste this code:
 
 ```
-wget -q "https://deer.obss.be/install.tar.gz" -O deer.tar.gz
+wget -q "https://deercore.org/install.tar.gz" -O deer.tar.gz
 tar -xf deer.tar.gz
-chmod +x run.sh
 sudo bash run.sh
-rm run.sh
 ```
 
-You can still use deer without making an account, but only to read repo's and execute them on your servers. To be able to push your software and repo's to the deer cloud, please make an account: https://deer.obss.be
+You can still use deer without making an account, but only to read repo's and execute them on your servers. To be able to push your software and repo's to the deer cloud, please make an account: https://deercore.org
 
 ## Quick Start
 
@@ -23,7 +21,15 @@ One of the first things you'll want to do is to turn safemode off. This is becau
 
 Make sure to always navigate to the directory you want to push. Deer will package everything in that directory and push it to the cloud. To do this, you need to first set your deer id: `deer id <myDeerId>`
 
-Where <myDeerId> is the value found by logging in to your personal dashboard on the deer cloud. Next, you can push your <dir> directory to the cloud:
+Where <myDeerId> is the value found by logging in to your personal dashboard on the deer cloud. Also be sure to include a _deer.yml_ file, describing how you want deer to run your app:
+
+```
+run:
+	- echo "This prints off a line"	# prints to its deer log
+	- java -jar *.jar				# run a java jar in the deer tarball
+```
+
+Next, you can push your <dir> directory to the cloud:
 
 ```
 cd <dir>

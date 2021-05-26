@@ -1,0 +1,14 @@
+[Unit]
+Description=Deer Daemon Service
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=whoami
+ExecStart=/usr/bin/env bash /srv/deerd/deerDaemon.sh
+
+[Install]
+WantedBy=multi-user.target

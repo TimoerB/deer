@@ -33,12 +33,18 @@ Options:
   stop <repo>               Stop the running repo instance
   add <file> <repo>:<path>  Add <file> to a repo on path <path>
   version, -v               Print version information
+  create <path>             Create a deer repo, this will automatically copy your binaries from <path>
+  build <path>              Build/update a deer repo, this will automatically copy your binaries from <path>
 
 Examples: 
   
   * Create repo from directory <dir>:
        cd <dir>
        deer push <dir>
+
+  * Create repo from deer (have your binaries ready in <dir>/<path>):
+       cd <dir>
+       deer create <path>
 
   * Run repo:
        deer <repo>
@@ -52,7 +58,7 @@ Examples:
 	exit 2
 fi
 
-VERSION="1.2.24"
+VERSION="1.2.25"
 
 red=`tput setaf 1`
 green=`tput setaf 2`
@@ -87,7 +93,7 @@ if [[ "$1" == "version" || "$1" == "-v" ]]; then
 fi
 
 if [[ "$1" == "ps" ]]; then
-	repos=$(ls -1 "$HOME/.deer" -I "*.conf")
+	repos=$(ls -1 "$HOME/.deer" -I "*.conf" | grep -v herd)
 	for repo in $repos; do 
 		pidc=$(ps -ef | grep "run.$repo" -c)
 		if [[ $pidc == "1" ]]; then
@@ -141,13 +147,6 @@ if [[ "$1" == "herd" && (("$#" == "3" && "$2" == "-f") || ("$#" == "2")) ]]; the
 		fi
 		herdFile="$HOME/.deer/$2/$2.herd"
 	fi
-#	echo "Reading herd file"
-#	while IFS= read -r line
-#	do
-#		deer "$line" &
-#	done < "$herdFile"
-#	exit 0
-
 
 	finishOffEnvDeer() {
 		deerName=$1
@@ -294,35 +293,37 @@ if [[ "$1" == "push" ]]; then
 	moved=false
 	if [ -f "deer.yml" ]; then
 		bash -c "echo '#!/bin/bash' > run.$dir.sh"
-		bash -c "echo 'if [[ \"\$#\" -eq 2 && \"\$1\" == \"-c\" ]]; then conf=\"config=\$dir\"; else conf=\"\"; fi' >> run.$dir.sh"
+		bash -c "echo 'if [[ \"\$#\" -eq 2 && \"\$1\" == \"-c\" ]]; then conf=\"config=\$2\"; else conf=\"\"; fi' >> run.$dir.sh"
 		prerunBegun=false
 		runBegun=false
 		while IFS= read -r line
 		do
-			if [[ "$runBegun" == true && "$line" == *"-"* ]]; then
-				#add runnable command line
-				line=$(echo "$line" | xargs | cut -c 2-)
-				if [[ "$line" == *"java"* ]]; then
-					bash -c "echo 'if [[ \"\$conf\" != \"\" ]]; then conf=\"--spring.config.location=\$dir\"; fi' >> run.$dir.sh"
-					bash -c "echo '$line \"\$conf\" &' >> run.$dir.sh"
-				else
-					bash -c "echo '$line \"\$conf\" &' >> run.$dir.sh"
+			if [[ "$line" != *"#"* ]]; then
+				if [[ "$runBegun" == true && "$line" == *"-"* ]]; then
+					#add runnable command line
+					line=$(echo "$line" | xargs | cut -c 2-)
+					if [[ "$line" == *"java"* ]]; then
+						bash -c "echo 'if [[ \"\$conf\" != \"\" ]]; then conf=\"--spring.config.location=\$2\"; fi' >> run.$dir.sh"
+						bash -c "echo '$line \"\$conf\" &' >> run.$dir.sh"
+					else
+						bash -c "echo '$line \"\$conf\" &' >> run.$dir.sh"
+					fi
+					bash -c "echo 'echo \$! >> running.pid' >> run.$dir.sh"
 				fi
-				bash -c "echo 'echo \$! >> running.pid' >> run.$dir.sh"
-			fi
-			if [[ "$prerunBegun" == true && "$line" == *"-"* ]]; then
-				#add prerun step
-				line=$(echo "$line" | xargs | cut -c 2-)
-				bash -c "echo '$line' >> prerun.$dir.sh"
-			fi
-			if [[ "$runBegun" == false && "$line" == "run:"* ]]; then
-				runBegun=true
-				prerunBegun=false
-			fi
-			if [[ "$prerunBegun" == false && "$line" == "prerun:"* ]]; then
-				prerunBegun=true
-				runBegun=false
-				bash -c "echo '#!/bin/bash' > prerun.$dir.sh"
+				if [[ "$prerunBegun" == true && "$line" == *"-"* ]]; then
+					#add prerun step
+					line=$(echo "$line" | xargs | cut -c 2-)
+					bash -c "echo '$line' >> prerun.$dir.sh"
+				fi
+				if [[ "$runBegun" == false && "$line" == "run:"* ]]; then
+					runBegun=true
+					prerunBegun=false
+				fi
+				if [[ "$prerunBegun" == false && "$line" == "prerun:"* ]]; then
+					prerunBegun=true
+					runBegun=false
+					bash -c "echo '#!/bin/bash' > prerun.$dir.sh"
+				fi
 			fi
 		done < "deer.yml"
 		bash -c "echo 'while true; do sleep 10; done' >> run.$dir.sh"
@@ -399,7 +400,29 @@ if [[ "$1" == "search" && "$#" == "2" ]]; then
 	exit 0
 fi
 
-if [[ ( "$#" == "1" ) && ( "$1" == "push" || "$1" == "herd" || "$1" == "pull" || "$1" == "stop" || "$1" == "restart" || "$1" == "logs" || "$1" == "add" || "$1" == "search" ) ]]; then
+# create or build/update a deer repo
+if [[ ("$1" == "create" || "$1" == "build" ) && "$#" -gt 1 ]]; then
+	if [[ "$1" == "create" ]]; then
+		echo "Creating deer space"
+		mkdir deer
+	fi
+	cd deer
+	binaries=$(find "../$2/" -maxdepth 1 -type f | grep -v \.original)
+    cp "../$2/$binaries" .
+	if [[ "$1" == "create" ]]; then
+		echo "# Example of a deer run file. This will run any jar file present in the repo
+run:
+	- java -jar *" > deer.yml
+		echo "Deer repo created in ./deer, next steps:"
+		echo " * edit deer.yml" 
+		echo " * push your repo: deer push <myRepo>"
+		exit 0
+	fi
+	echo "Deer repo built in ./deer"
+	exit 0
+fi
+
+if [[ ( "$#" == "1" ) && ( "$1" == "push" || "$1" == "herd" || "$1" == "pull" || "$1" == "stop" || "$1" == "restart" || "$1" == "logs" || "$1" == "add" || "$1" == "search" || "$1" == "create" ) ]]; then
 	echo "No decent repo mentioned"
 	exit 0
 fi

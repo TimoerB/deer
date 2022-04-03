@@ -1,17 +1,17 @@
 # Deer
-Deer - Download Extract make Executable & Run - is a lightweight deploy manager to create, run and manage executable tarballs for any software. Official website and more information can be found on: https://deercore.org .
+Deer - Download Extract make Executable & Run - is a lightweight deploy manager to create, run and manage executable tarballs for any software. Official website and more information can be found on: https://nexarcore.com/deer .
 
 ## Install Deer
 
 To install deer, open a terminal with root access and copypaste this code:
 
 ```
-wget -q "https://deercore.org/install.tar.gz" -O deer.tar.gz
+wget -q "https://nexarcore.com/deer/install.tar.gz" -O deer.tar.gz
 tar -xf deer.tar.gz
 sudo bash run.sh
 ```
 
-You can still use deer without making an account, but only to read repo's and execute them on your servers. To be able to push your software and repo's to the deer cloud, please make an account: https://deercore.org
+You can still use deer without making an account, but only to read repo's and execute them on your servers. To be able to push your software and repo's to the deer cloud, please make an account: https://nexarcore.com/deer
 
 ## Quick Start
 

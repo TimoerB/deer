@@ -18,7 +18,7 @@ Options:
   safemode                  Display whether safemode is on or off
       	                    Safemode only allows you to download and execute repo's made with your own deer id. When safemode is on, deer id must be set. 
                             To download and execute any public repo, turn safemode off: deer safemode off
-  id                        Display the currently set deer id (given on the deer cloud: https://deercore.org)
+  id                        Display the currently set deer id (given on the deer cloud: https://nexarcore.com/deer)
                             Deer id is mainly needed to push repo's to the deer cloud, but also to read and execute repo's when safemode is on. Set deer id: deer id <myDeerId>
   uninstall                 Uninstall deer
   herd <repo>               Deploy multiple deer files structured by a herd file
@@ -58,7 +58,7 @@ Examples:
 	exit 2
 fi
 
-VERSION="1.2.25"
+VERSION="1.2.26"
 
 red=`tput setaf 1`
 green=`tput setaf 2`
@@ -71,7 +71,7 @@ fi
 
 if [[ "$1" == "update" || "$1" == "upgrade" ]]; then
 	cd /tmp
-	sudo wget -q "https://deercore.org/install.tar.gz" -O deer.tar.gz
+	sudo wget -q "https://nexarcore.com/deer/install.tar.gz" -O deer.tar.gz
 	sudo tar -xf deer.tar.gz
 	sudo rm -f deer.tar.gz
 	
@@ -305,6 +305,8 @@ if [[ "$1" == "push" ]]; then
 					if [[ "$line" == *"java"* ]]; then
 						bash -c "echo 'if [[ \"\$conf\" != \"\" ]]; then conf=\"--spring.config.location=\$2\"; fi' >> run.$dir.sh"
 						bash -c "echo '$line \"\$conf\" &' >> run.$dir.sh"
+					elif [[ "$line" == *"sleep "* ]]; then
+						bash -c "echo '$line' >> run.$dir.sh"
 					else
 						bash -c "echo '$line \"\$conf\" &' >> run.$dir.sh"
 					fi
@@ -341,7 +343,7 @@ if [[ "$1" == "push" ]]; then
 	rm -f "$dir.tar.gz"
 	order=0
 	for chunk in *; do
-		uploadResponse=$(curl -L -F "deerified=@$chunk" -F "deerId=$deerId" -F "repoName=$dir.tar.gz" -F "order=$order" -F "runnable=$moved" -F "checksum=$checksum" https://deercore.org/upload.php)
+		uploadResponse=$(curl -L -F "deerified=@$chunk" -F "deerId=$deerId" -F "repoName=$dir.tar.gz" -F "order=$order" -F "runnable=$moved" -F "checksum=$checksum" https://nexarcore.com/deer/upload.php)
 		echo "$uploadResponse" | cut -d ':' -f2 | cut -d '"' -f2
 		order=$((order+1))
 	done
@@ -395,7 +397,7 @@ fi
 
 if [[ "$1" == "search" && "$#" == "2" ]]; then
 	hostname=$(hostname)
-	resp=$(curl -s -L "https://deercore.org/api.php?action=search&hostname=$hostname&deerId=$deerId&repos=$2")
+	resp=$(curl -s -L "https://nexarcore.com/deer/api.php?action=search&hostname=$hostname&deerId=$deerId&repos=$2")
 	echo $resp | cut -d ':' -f2 | cut -d '"' -f2 | sed 's/\\n/\n /g' | sed 's/\\//g'
 	exit 0
 fi
@@ -412,7 +414,7 @@ if [[ ("$1" == "create" || "$1" == "build" ) && "$#" -gt 1 ]]; then
 	if [[ "$1" == "create" ]]; then
 		echo "# Example of a deer run file. This will run any jar file present in the repo
 run:
-	- java -jar *" > deer.yml
+	- java -jar *.jar" > deer.yml
 		echo "Deer repo created in ./deer, next steps:"
 		echo " * edit deer.yml" 
 		echo " * push your repo: deer push <myRepo>"
@@ -507,7 +509,7 @@ if [ "$created" = true ]; then
 
 	#finally get the repo and execute
 	echo "[$repo] Pulling $repo from the deer cloud"
-	wget -q "https://deercore.org?run=$repo&$safeModeParam" -O deer.tar.gz -o /dev/null
+	wget -q "https://nexarcore.com/deer?run=$repo&$safeModeParam" -O deer.tar.gz -o /dev/null
 	if tar -xf deer.tar.gz 2>/dev/null
 	then
 		rm -f deer.tar.gz

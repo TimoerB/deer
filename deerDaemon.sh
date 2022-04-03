@@ -17,7 +17,7 @@ do
 			repos="$repos$repo,"
 		done < repos.tmp
 		rm -f repos.tmp
-		curl -L "https://deercore.org/api.php?action=searchRepo&hostname=$hostname&deerId=$deerId&repos=$repos" | \
+		curl -L "https://nexarcore.com/deer/api.php?action=searchRepo&hostname=$hostname&deerId=$deerId&repos=$repos" | \
 			python3 -c "import sys, json; print(json.load(sys.stdin)['name'])"
 	else
 		echo "No deer id set. Doing nothing, just sleeping.."

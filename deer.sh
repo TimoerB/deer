@@ -58,7 +58,7 @@ Examples:
 	exit 2
 fi
 
-VERSION="1.2.26"
+VERSION="1.2.27"
 
 red=`tput setaf 1`
 green=`tput setaf 2`
@@ -305,17 +305,18 @@ if [[ "$1" == "push" ]]; then
 					if [[ "$line" == *"java"* ]]; then
 						bash -c "echo 'if [[ \"\$conf\" != \"\" ]]; then conf=\"--spring.config.location=\$2\"; fi' >> run.$dir.sh"
 						bash -c "echo '$line \"\$conf\" &' >> run.$dir.sh"
-					elif [[ "$line" == *"sleep "* ]]; then
+						bash -c "echo 'echo \$! >> running.pid' >> run.$dir.sh"
+					elif [[ "$line" == *"sleep "* || "$line" == *"cd "* ]]; then
 						bash -c "echo '$line' >> run.$dir.sh"
 					else
 						bash -c "echo '$line \"\$conf\" &' >> run.$dir.sh"
+						bash -c "echo 'echo \$! >> running.pid' >> run.$dir.sh"
 					fi
-					bash -c "echo 'echo \$! >> running.pid' >> run.$dir.sh"
 				fi
 				if [[ "$prerunBegun" == true && "$line" == *"-"* ]]; then
 					#add prerun step
-					line=$(echo "$line" | xargs | cut -c 2-)
-					bash -c "echo '$line' >> prerun.$dir.sh"
+					line=$(echo "$line" | xargs -0 | cut -c 3-)
+					bash -c "echo \"$line\" >> prerun.$dir.sh"
 				fi
 				if [[ "$runBegun" == false && "$line" == "run:"* ]]; then
 					runBegun=true

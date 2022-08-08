@@ -18,3 +18,5 @@ cd /usr/bin
 ln -fs ../lib/deer.sh deer
 service deerd start
 systemctl enable deerd
+
+echo '. /etc/bash_completion.d/deer-completion.sh' >> /home/$user/.bashrc

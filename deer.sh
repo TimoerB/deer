@@ -58,7 +58,7 @@ Examples:
 	exit 2
 fi
 
-VERSION="1.2.27"
+VERSION="1.2.28"
 
 red=`tput setaf 1`
 green=`tput setaf 2`
@@ -303,32 +303,37 @@ if [[ "$1" == "push" ]]; then
 					#add runnable command line
 					line=$(echo "$line" | xargs | cut -c 2-)
 					if [[ "$line" == *"java"* ]]; then
+					    bash -c "echo '' >> run.$dir.sh"
 						bash -c "echo 'if [[ \"\$conf\" != \"\" ]]; then conf=\"--spring.config.location=\$2\"; fi' >> run.$dir.sh"
 						bash -c "echo '$line \"\$conf\" &' >> run.$dir.sh"
 						bash -c "echo 'echo \$! >> running.pid' >> run.$dir.sh"
 					elif [[ "$line" == *"sleep "* || "$line" == *"cd "* ]]; then
+					    bash -c "echo '' >> run.$dir.sh"
 						bash -c "echo '$line' >> run.$dir.sh"
 					else
-						bash -c "echo '$line \"\$conf\" &' >> run.$dir.sh"
-						bash -c "echo 'echo \$! >> running.pid' >> run.$dir.sh"
+					    bash -c "echo '' >> run.$dir.sh"
+						bash -c "echo -n '$line \"\$conf\"' >> run.$dir.sh"
+						# bash -c "echo -n 'echo \$! >> running.pid' >> run.$dir.sh"
 					fi
 				fi
 				if [[ "$prerunBegun" == true && "$line" == *"-"* ]]; then
-					#add prerun step
-					line=$(echo "$line" | xargs -0 | cut -c 3-)
+					line=$(echo "$line" | xargs -0 | cut -d '-' -f2-)
+					bash -c "echo '' >> run.$dir.sh"
 					bash -c "echo \"$line\" >> prerun.$dir.sh"
 				fi
-				if [[ "$runBegun" == false && "$line" == "run:"* ]]; then
+				if [[ "$runBegun" == false && "$line" == *"run:"* ]]; then
 					runBegun=true
 					prerunBegun=false
 				fi
-				if [[ "$prerunBegun" == false && "$line" == "prerun:"* ]]; then
+				if [[ "$prerunBegun" == false && "$line" == *"prerun:"* ]]; then
 					prerunBegun=true
 					runBegun=false
 					bash -c "echo '#!/bin/bash' > prerun.$dir.sh"
 				fi
 			fi
 		done < "deer.yml"
+		bash -c "echo -n \" &\" >> run.$dir.sh
+		bash -c "echo 'echo \$! >> running.pid' >> run.$dir.sh
 		bash -c "echo 'while true; do sleep 10; done' >> run.$dir.sh"
 		moved=true
 	fi
